@@ -1,0 +1,148 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    compileSdkVersion 30
+    buildToolsVersion "30.0.2"
+
+    defaultConfig {
+        applicationId "com.zly.environmemtconfig"
+        minSdkVersion 16
+        targetSdkVersion 30
+        versionCode 1
+        versionName "1.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
+        // 多渠道打包，AS3.0之后：原因就是使用了productFlavors分包，解决方法就是在build.gradle中的defaultConfig中
+        // 添加一个flavorDimensions "1"就可以了，后面的1一般是跟你的versionCode相同
+        flavorDimensions "1"
+
+        buildConfigField("boolean", "IS_PRODUCT", "false")
+    }
+
+    signingConfigs {
+        release {
+            storeFile file("../yipingcankey.jks")
+            keyAlias '上海'
+            keyPassword '88888888'
+            storePassword '88888888'
+        }
+    }
+
+    buildTypes {
+        debug {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    sourceSets {
+
+        //开发版本使用的配置文件
+        auto {
+            assets.srcDirs = ['assets', 'configs/auto']
+        }
+
+        // 线上产品版本使用的配置文件
+        product {
+            assets.srcDirs = ['assets', 'configs/release']
+        }
+    }
+
+    //多渠道打包
+    productFlavors {
+
+        // 开发版本
+        auto {
+            //可以设置app不同环境的名字
+            manifestPlaceholders = [app_name: "支付宝-Auto"]
+        }
+
+        // 线上产品版本
+        product {
+            buildConfigField('boolean', 'IS_PRODUCT', "true")
+            manifestPlaceholders = [app_name: "支付宝"]
+        }
+    }
+
+    applicationVariants.all { variant ->
+        variant.outputs.all { output ->
+            def buildTypeName = variant.buildType.name
+            def versionName = defaultConfig.versionName
+            // 多渠道打包的时候，后台不支持中文
+            outputFileName = "appName-v${versionName}-${buildTypeName}-${buildTime()}.apk"
+        }
+    }
+}
+
+static def buildTime() {
+    def date = new Date()
+    def formattedDate = date.format('MMddHHmmss')
+    return formattedDate
+}
+
+
+dependencies {
+
+    implementation 'androidx.appcompat:appcompat:1.2.0'
+    implementation 'com.google.android.material:material:1.2.1'
+    implementation 'androidx.constraintlayout:constraintlayout:2.0.4'
+    testImplementation 'junit:junit:4.+'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.2'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.3.0'
+}
+
+//设置默认环境：不写参数或者环境名错误，则默认test
+setDefaultEnv()
+
+def setDefaultEnv() {
+    def envName = envConfig()
+    def envConfigDir = "${rootDir}/app/configs/auto/"
+    //def envConfigDir = "${rootDir}/app/configs/release/"
+    def renameFile = "config.properties"
+    println("打包接口环境：${envName}")
+    task configCopy(type: Copy) {
+        copy {
+            delete "${envConfigDir}/${renameFile}"
+            from(envConfigDir)
+            into(envConfigDir)
+            include(envName)
+            rename(envName, renameFile)
+        }
+    }
+}
+
+String envConfig() {
+
+    def envName = "test"  //默认环境
+
+    if (hasProperty("env")) {
+        envName = getPropmerty("env")
+    }
+    println("参数为：${envName}")
+
+    def envFileName = 'configTest'
+
+    if (envName == "test")
+        envFileName = 'configTest'
+    else if (envName == "pre")
+        envFileName = 'configPre'
+    else if (envName == "product")
+        envFileName = 'configProduct'
+
+    return envFileName + ".properties"
+}
